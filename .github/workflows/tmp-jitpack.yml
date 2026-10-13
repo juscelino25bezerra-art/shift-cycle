@@ -1,0 +1,46 @@
+# TEMPORÁRIO: confere a instalação pelo JitPack (removido depois).
+name: tmp-jitpack
+on: { push: { branches: [validacao] } }
+permissions: { contents: read }
+jobs:
+  jitpack:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with: { persist-credentials: false }
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with: { distribution: temurin, java-version: '17' }
+      - name: JitPack compila o commit
+        run: |
+          U=https://jitpack.io/com/github/juscelino25bezerra-art/shift-cycle/14ccc265f5
+          for i in $(seq 1 40); do
+            code=$(curl -s -o pom.xml -w '%{http_code}' --max-time 120 "$U/shift-cycle-14ccc265f5.pom")
+            echo "tentativa $i: $code"; [ "$code" = 200 ] && break; sleep 20
+          done
+          curl -s --max-time 60 "$U/build.log" | tail -25 > build-tail.log; cat build-tail.log
+          [ "$code" = 200 ] || { echo "::error::JitPack não publicou: $(tail -3 build-tail.log | tr '\n' ' ')"; exit 1; }
+          echo "::notice::JitPack OK: $(grep -o '<name>GPL[^<]*' pom.xml)"
+      - name: Projeto consumidor
+        run: |
+          mkdir -p /tmp/app/src/main/kotlin && cd /tmp/app
+          cp $GITHUB_WORKSPACE/gradlew . && cp -r $GITHUB_WORKSPACE/gradle .
+          cat > settings.gradle.kts <<'K'
+          dependencyResolutionManagement { repositories { mavenCentral(); maven("https://jitpack.io") } }
+          rootProject.name = "app"
+          K
+          cat > build.gradle.kts <<'K'
+          plugins { kotlin("jvm") version "2.1.0"; application }
+          dependencies { implementation("com.github.juscelino25bezerra-art:shift-cycle:14ccc265f5") }
+          application { mainClass.set("MainKt") }
+          K
+          cat > src/main/kotlin/Main.kt <<'K'
+          import io.github.juscelino25bezerraart.shiftcycle.*
+          import java.time.LocalDate
+          fun main() {
+              val s = Schedule(anchor = "2026-01-01", blocks = listOf(Block(4, 1)))
+              val d = ShiftCycle.status(LocalDate.of(2026, 1, 5), s)
+              println("RESULTADO " + ShiftCycle.posLabel(d.work, d.n, d.block))
+          }
+          K
+          ./gradlew --no-daemon -q run | tee out.txt
+          echo "::notice::$(grep RESULTADO out.txt)"
