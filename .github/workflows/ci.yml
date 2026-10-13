@@ -1,0 +1,45 @@
+# shift-cycle — Copyright (C) 2026 Juscelino Be
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Build and tests on every push and pull request. Read-only token, no secrets.
+# Actions pinned by full commit SHA (version in the comment). To update: pick the new release, get its
+# SHA with `git ls-remote --tags https://github.com/<owner>/<action> 'refs/tags/vX.Y.Z*'` (for an annotated
+# tag, the line ending in ^{}), replace SHA and comment, and check the workflow on a pull request.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Validate the Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Build and test
+        run: ./gradlew --no-daemon build
+
+      - name: Runtime dependencies (only the Kotlin standard library is expected)
+        run: |
+          ./gradlew --no-daemon -q dependencies --configuration runtimeClasspath | tee runtime-deps.txt
+          if grep -E '^[+\\]--- ' runtime-deps.txt | grep -vE 'org\.jetbrains\.kotlin:kotlin-stdlib|org\.jetbrains:annotations'; then
+            echo "::error::New runtime dependency: review its license and update THIRD_PARTY_NOTICES.md."
+            exit 1
+          fi
