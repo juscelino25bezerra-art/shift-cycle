@@ -17,7 +17,9 @@ jobs:
             code=$(curl -s -o pom.xml -w '%{http_code}' --max-time 120 "$U/shift-cycle-14ccc265f5.pom")
             echo "tentativa $i: $code"; [ "$code" = 200 ] && break; sleep 20
           done
-          curl -s --max-time 60 "$U/build.log" | tail -25 > build-tail.log; cat build-tail.log
+          curl -s --max-time 60 "$U/build.log" > build.log; cat build.log
+          grep -nE "ERROR|error:|FAILURE|What went wrong|Exception|BUILD|JDK|java version|Running|Tasks|gradle" build.log | head -60 > key.txt || true
+          split -l 6 key.txt part_ && for f in part_*; do echo "::warning::$(tr '\n' '|' < $f | cut -c1-900)"; done
           [ "$code" = 200 ] || { echo "::error::JitPack não publicou: $(tail -3 build-tail.log | tr '\n' ' ')"; exit 1; }
           echo "::notice::JitPack OK: $(grep -o '<name>GPL[^<]*' pom.xml)"
       - name: Projeto consumidor
