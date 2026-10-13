@@ -43,3 +43,16 @@ jobs:
             echo "::error::New runtime dependency: review its license and update THIRD_PARTY_NOTICES.md."
             exit 1
           fi
+
+      # The same publication JitPack builds: jar, sources and a POM with the GPL-3.0-or-later license.
+      - name: Maven publication
+        run: |
+          ./gradlew --no-daemon -q publishToMavenLocal
+          d="$HOME/.m2/repository/io/github/juscelino25bezerra-art/shift-cycle/1.0.0"
+          ls "$d"
+          for f in shift-cycle-1.0.0.jar shift-cycle-1.0.0-sources.jar shift-cycle-1.0.0.pom; do
+            [ -f "$d/$f" ] || { echo "::error::$f missing from the publication"; exit 1; }
+          done
+          grep -q "<name>GPL-3.0-or-later</name>" "$d/shift-cycle-1.0.0.pom" || { echo "::error::license missing from the POM"; exit 1; }
+          unzip -l "$d/shift-cycle-1.0.0.jar" | tee jar.txt
+          grep -q "META-INF/LICENSE" jar.txt || { echo "::error::LICENSE missing from the jar"; exit 1; }

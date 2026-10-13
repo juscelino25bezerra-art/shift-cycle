@@ -1,0 +1,5 @@
+# shift-cycle — Copyright (C) 2026 Juscelino Be
+# SPDX-License-Identifier: GPL-3.0-or-later
+# JitPack (https://jitpack.io) builds each tag and publishes it with `publishToMavenLocal`.
+jdk:
+  - openjdk17
